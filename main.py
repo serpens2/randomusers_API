@@ -153,7 +153,7 @@ def registrate_user(name: str = Form(...), gender: str = Form(...),
 @with_db
 def find_user_with_db(cur,username: str):
     cur.execute("""
-    SELECT username, pwd_hash FROM randomusers WHERE username = %s
+    SELECT username, pwd_hash, name, gender, country, email FROM randomusers WHERE username = %s
     """, (username,))
     results = cur.fetchone()
     return results
@@ -197,3 +197,16 @@ def delete_user(username: str, creds: HTTPAuthorizationCredentials = Depends(htt
     if not db_exists('randomusers'):
         raise HTTPException(status_code=500, detail='Table does not exist')
     return delete_user_with_db(username)
+
+@app.get('/me', description='Get info about yourself after successful login')
+def get_me(creds: HTTPAuthorizationCredentials = Depends(http_bearer)):
+    token = creds.credentials
+    try:
+        payload = jwt.decode(token, PUBLIC_KEY, algorithms=['RS256']) # already checks expiration date
+    except Exception as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    username = payload['sub']
+    info_db = find_user_with_db(username)
+    info = {'username': info_db[0], 'name': info_db[2], 'gender': info_db[3],
+            'country': info_db[4], 'email': info_db[5]}
+    return {'info': info}
